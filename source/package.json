@@ -1,0 +1,13 @@
+{
+  "name": "keyform",
+  "version": "1.0.0",
+  "description": "Keyform: a keymap editor for ZMK Studio keyboards, built into a single HTML file",
+  "scripts": {
+    "build": "node build.mjs"
+  },
+  "dependencies": {
+    "@zmkfirmware/zmk-studio-ts-client": "^0.0.18",
+    "esbuild": "^0.28.2"
+  },
+  "private": true
+}

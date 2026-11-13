@@ -1,0 +1,4 @@
+# Which firmware GitHub should build
+include:
+  - board: bs_lp_60
+    snippet: studio-rpc-usb-uart
