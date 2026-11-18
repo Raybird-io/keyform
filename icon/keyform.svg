@@ -1,27 +1,11 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">
-  <defs>
-    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#7ff0d0"/>
-      <stop offset="1" stop-color="#2f9c84"/>
-    </linearGradient>
-    <linearGradient id="side" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#22262e"/>
-      <stop offset="1" stop-color="#0b0c0f"/>
-    </linearGradient>
-    <linearGradient id="top" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#2c313b"/>
-      <stop offset="1" stop-color="#1b1e25"/>
-    </linearGradient>
-  </defs>
-  <rect x="16" y="16" width="224" height="224" rx="56" fill="url(#bg)"/>
-  <rect x="17.5" y="17.5" width="221" height="221" rx="54.5" fill="none" stroke="#fff" stroke-opacity=".28" stroke-width="3"/>
-  <!-- keycap shadow -->
-  <rect x="62" y="74" width="132" height="128" rx="28" fill="#0a3a30" fill-opacity=".35"/>
+  <!-- Keyform logo in neutral tones, so it sits well with any theme colour, light or dark -->
+  <rect x="16" y="16" width="224" height="224" rx="64" fill="#2a2b30"/>
+  <rect x="17.5" y="17.5" width="221" height="221" rx="62.5" fill="none" stroke="#ffffff" stroke-opacity=".12" stroke-width="3"/>
   <!-- keycap body -->
-  <rect x="60" y="62" width="136" height="132" rx="28" fill="url(#side)"/>
+  <rect x="58" y="62" width="140" height="136" rx="34" fill="#c7c8cf"/>
   <!-- keycap top surface -->
-  <rect x="76" y="70" width="104" height="96" rx="20" fill="url(#top)"/>
-  <rect x="76.75" y="70.75" width="102.5" height="94.5" rx="19.25" fill="none" stroke="#fff" stroke-opacity=".08" stroke-width="1.5"/>
+  <rect x="74" y="70" width="108" height="98" rx="26" fill="#f2f2f5"/>
   <!-- homing bar -->
-  <rect x="110" y="142" width="36" height="7" rx="3.5" fill="#6ee7c5"/>
+  <rect x="108" y="140" width="40" height="9" rx="4.5" fill="#2a2b30"/>
 </svg>

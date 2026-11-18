@@ -16,3 +16,15 @@ and download the `firmware` artifact (contains the .uf2).
 
 To add more Studio layers: copy one `extra_layer_N { ... };` block in the
 keymap, give it a new number, push, and flash the new .uf2.
+
+Double Tap add-on: `zephyr/module.yml`, `CMakeLists.txt`, `Kconfig`, `dts/` and `src/` make this
+repo a small ZMK module that adds a "Double Tap" behavior with two keys as parameters
+(single tap, double tap). They are set per key in Keyform (Advanced -> Double Tap), so new pairs
+need no reflashing. The Double Tap nodes at the top of the keymap are the speeds, 150-300 ms in steps of 5
+(one node per speed, because ZMK Studio can't send a timing). Keyform shows them as one slider. Keep the node names as they are:
+saved keys refer to them by name.
+
+Layer report: `src/layer_report.c` makes the keyboard briefly send a reserved HID key code
+(0xA5 + layer ID) whenever the active layer changes. Computers ignore these codes; the Keyform
+notifier (`linux/notifier/` in the Keyform repo) reads them to show layer notifications.
+Turn it off with `CONFIG_KEYFORM_LAYER_REPORT=n` in `config/bs_lp_60.conf`.

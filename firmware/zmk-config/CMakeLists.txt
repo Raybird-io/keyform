@@ -1,0 +1,2 @@
+target_sources_ifdef(CONFIG_ZMK_BEHAVIOR_DOUBLE_TAP app PRIVATE src/behaviors/behavior_double_tap.c)
+target_sources_ifdef(CONFIG_KEYFORM_LAYER_REPORT app PRIVATE src/layer_report.c)

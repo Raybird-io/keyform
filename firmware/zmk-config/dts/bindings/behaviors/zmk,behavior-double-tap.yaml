@@ -1,0 +1,12 @@
+description: |
+  Double tap with the keys as parameters, so they can be chosen per key (e.g. in ZMK Studio).
+  &dbl TAP_KEY DOUBLE_TAP_KEY
+
+compatible: "zmk,behavior-double-tap"
+
+include: two_param.yaml
+
+properties:
+  tapping-term-ms:
+    type: int
+    default: 200

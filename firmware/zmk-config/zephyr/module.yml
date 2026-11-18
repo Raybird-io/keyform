@@ -1,0 +1,7 @@
+# Makes this config repo also a ZMK module, so it can add the Double Tap behavior below.
+name: keyform-double-tap
+build:
+  cmake: .
+  kconfig: Kconfig
+  settings:
+    dts_root: .

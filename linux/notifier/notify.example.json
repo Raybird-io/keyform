@@ -1,0 +1,20 @@
+{
+  "keyboard": {
+    "vendor": "1d50",
+    "product": "615e"
+  },
+  "timeout_ms": 2000,
+  "notify_unknown_layers": true,
+  "layers": {
+    "0": {
+      "name": "Base",
+      "notify": true,
+      "message": "⌨️ Base layer"
+    },
+    "1": {
+      "name": "Nav",
+      "notify": false,
+      "message": "Nav layer"
+    }
+  }
+}

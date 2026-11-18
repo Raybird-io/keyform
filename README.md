@@ -20,8 +20,14 @@
 
 - **Visual remapping.** Click a key, pick what it does from tabs (Keys, Media, Layers, Bluetooth, Special, Advanced) instead of dropdowns. Add Ctrl/Shift/Alt/Win for shortcuts like Ctrl + C.
 - **Layers.** Add, rename, reorder and remove layers. Empty keys show what the layer below does, greyed out.
+- **Duplicate and copy layers.** *Duplicate* makes a new layer with all the keys of the current one, placed right after it. *Copy keys from…* fills the current layer with another layer's keys: replace them all, or only fill the empty ones.
+- **Set a key on several layers.** "Also set on" under the key editor writes your next change to the layers you pick, or to all of them, e.g. a game-layer toggle that works from every layer.
+- **Home page with your current layer, live.** Shows which layer is on right now and follows as you switch, plus a summary of your setup. The active layer also gets a green dot in Remap. Needs the notifier (below).
+- **Layer notifications.** A desktop notification when you switch layer, e.g. "🎮 Game on", with per-layer on/off and your own message (🔔 Notify next to the layer buttons). Linux, with the included notifier and firmware.
+- **Fn works on every layer.** Hold layers (like Nav) are kept at the end of the list automatically, so holding Fn always gives you Nav, whatever layer is on.
 - **Tap-hold keys.** Layer-Tap and Mod-Tap ("tap for Z, hold for Shift") through the Advanced tab.
-- **Overview.** A list of every key that does more than type one character, on every layer, with a small map showing where it sits. Click a row to edit it.
+- **Double-tap keys.** Advanced → Double Tap: pick a key for a single tap and one for a double tap (e.g. Q / Numpad 1), plus how long it waits for a second tap (slider, 150–300 ms in steps of 5, default 200), on any key and layer. Needs the included firmware.
+- **Overview.** A list of every key that does more than type one character, on every layer, with a small map showing where it sits. Click a row to edit it. A search box finds keys by what they do, their name, layer or position.
 - **Live keys.** Keys light up as you press them, including keys on other layers (dashed outline) and the layer key that got you there.
 - **Key tester.** Press every key and watch them turn green, handy after swapping switches.
 - **Auto-connect.** After picking the keyboard once, Keyform reconnects by itself (Chrome/Edge; see the Firefox note).
@@ -54,6 +60,48 @@
 
 ---
 
+## Making a game layer
+
+1. Select **Base** and click **Duplicate**. Rename the copy to **Game**, then change only the keys you need.
+2. Give Game a key to switch it on and off: pick any key, e.g. one on your Nav layer, and choose **Layers → Game → Toggle**.
+3. Click **Save**.
+
+Holding Fn still gives you Nav while Game is on. Keyform keeps Nav at the end of the layer list for that.
+
+---
+
+## Match your desktop colours (DankMaterialShell / matugen)
+
+Keyform can follow your desktop theme: new wallpaper or light/dark switch in DMS, and Keyform matches next time you open it. Without this it uses its built-in blue.
+
+`./linux/install.sh` sets this up. It adds a small template to matugen (the colour tool behind DMS's theming). When your theme changes, matugen writes the colours to `keyform-theme.css` and runs `keyform-apply-theme`, which copies them into your installed `keyform.html` itself, so it works in any browser, Flatpak ones included. Change your wallpaper or theme in DMS once to create it. To keep the built-in colours instead: `./linux/install.sh --no-theme`.
+
+If the file doesn't appear after a theme change, DMS may not be running your own matugen templates. Look for a "user templates" or "matugen templates" option in DMS's Wallpaper & colors settings.
+
+## Layer notifications (Linux)
+
+The firmware quietly tells the computer which layer is on (using a reserved key code that nothing types), and a small background program shows a notification.
+
+1. Flash the firmware in `firmware/` (it includes the layer report).
+2. Run `./linux/install.sh` (it installs the notifier along with the app). The notifier runs in the background and starts at every login. It needs no extra software, only Python 3 and `notify-send`, which most desktops have.
+3. It needs permission to read the keyboard. This udev rule covers USB and Bluetooth. Put it in `/etc/udev/rules.d/70-zmk-keyboard.rules` (or your image), then unplug and replug the keyboard:
+   ```
+   SUBSYSTEM=="tty", ATTRS{idVendor}=="1d50", ATTRS{idProduct}=="615e", TAG+="uaccess"
+   KERNEL=="hidraw*", KERNELS=="*:1D50:615E.*", TAG+="uaccess"
+   ```
+4. In Keyform (opened from the app menu), pick a layer, click **🔔 Notify** and choose whether it notifies and what it says. Changes reach the notifier by themselves. If the notifier isn't running, **Save notifier settings** puts a file in Downloads instead; the notifier takes it later and deletes it, so nothing piles up.
+
+The notifier also shares the current layer with Keyform over a private link on your own PC (`http://127.0.0.1:47811`, not reachable from other devices). Keyform uses it for the live Home page and sends notification settings back over it.
+
+Safety and resources:
+- The link needs a secret key that the installer creates once (`~/.config/keyform/token`, readable only by you) and writes into your installed Keyform. Websites and other programs don't have it, so they can't read your layer or change settings.
+- Settings are checked strictly before use: unknown fields are dropped, text is shortened and cleaned, and messages are passed to `notify-send` without a shell, so they can never run a command.
+- The notifier sleeps until the keyboard sends something, looks for a missing keyboard every 3 seconds (once a minute when it's found), and only rereads its settings when the file changed. Keyform retries the link with growing pauses, up to once a minute, when the notifier isn't running.
+
+Extras: `keyform-notify --test 2` shows layer 2's notification, and `keyform-notify --devices` checks that it finds the keyboard. The current layer is also written to `$XDG_RUNTIME_DIR/keyform-layer` for status bars (Waybar etc.). To leave it out: `./linux/install.sh --no-notifier`.
+
+---
+
 ## Setting up on a new PC
 
 1. Download this repository (green **Code** button → **Download ZIP**) and unzip it, or:
@@ -63,10 +111,13 @@
 2. **Linux:** add Keyform to your app menu with the included installer:
    ```bash
    cd keyform
-   ./linux/install.sh            # puts the app in ~/Keyform
+   ./linux/install.sh            # app, launcher, icons, notifier and theme following, in ~/Keyform
    # or: ./linux/install.sh ~/Keyboard   to choose another folder
+   # skip parts with --no-notifier and/or --no-theme
    ```
-   Then search for **Keyform** in your app menu. To remove the launcher again: `./linux/uninstall.sh`.
+   Then search for **Keyform** in your app menu. Run the same command again after every update: it replaces the previous install instead of adding to it, and keeps your notification settings. To remove everything: `./linux/uninstall.sh` (add `--all` to remove your settings too, leaving nothing behind).
+
+   If Chromium, Chrome, Brave or Edge is installed, the launcher opens Keyform in its own app window, with the Keyform icon in your dock and window switcher. Otherwise it opens as a tab in your default browser.
 
    The app is installed into a normal folder on purpose. Snap and Flatpak browsers can't open files inside hidden folders like `~/.local`.
 3. **Windows / macOS:** keep `keyform.html` somewhere permanent (e.g. `Documents/Keyform`), open it once and bookmark it.
@@ -90,7 +141,8 @@ Your keymap never touches GitHub. The page just runs in your browser and talks t
 
 | File | What it is |
 |---|---|
-| `rechteck-zmk-studio.uf2` | **Current firmware.** ZMK v0.3 with Studio enabled, unlock key off, 6 spare layers for Studio/Keyform |
+| `rechteck-zmk-studio.uf2` | **Current firmware.** ZMK v0.3 with Studio enabled, unlock key off, 6 spare layers for Studio/Keyform, and the Double Tap add-on |
+| `rechteck-zmk-studio-before-doubletap.uf2` | The same without Double Tap. Flash this to go back if Double Tap gives trouble |
 | `rechteck-zmk-studio-old-2layers.uf2` | Previous version (only Base + Nav, no spare layers). Fallback if needed |
 | `zmk-config/` | The source files the firmware is built from |
 
@@ -156,7 +208,8 @@ Open `keyform.html?demo` to try changes without a keyboard.
 
 ## Limits
 
-- Combos, macros and tap-dance ("double press") keys can't be *created* from Keyform or ZMK Studio. They need a firmware change. Existing ones do show up in the Overview.
+- Combos and macros can't be *created* from Keyform or ZMK Studio. They need a firmware change. Existing ones do show up in the Overview.
+- Double tap works through the Double Tap add-on in `firmware/zmk-config` (normal ZMK can't set double taps from an app). After a single tap it waits for a possible second tap (150–300 ms, set with the slider) before sending the key.
 - Keyform can only change what the keyboard's firmware allows through ZMK Studio.
 
 ## Credits

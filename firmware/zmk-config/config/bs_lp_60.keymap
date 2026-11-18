@@ -18,6 +18,61 @@
 #define NAV_L 1
 
 / {
+	// Double Tap: single tap sends the first key, double tap the second.
+	// Both keys are chosen per key in Keyform (Advanced -> Double Tap), no reflashing needed.
+	// tapping-term-ms is how long it waits for a second tap (Normal 200, Fast 150, Relaxed 250, plus every 5 ms from 150 to 300).
+	behaviors {
+		dbl: double_tap {
+			compatible = "zmk,behavior-double-tap";
+			display-name = "Double Tap";
+			#binding-cells = <2>;
+			tapping-term-ms = <200>;
+		};
+		// Same, with a shorter / longer wait. Keyform shows these as the Speed choice of Double Tap.
+		dbl_fast: double_tap_fast {
+			compatible = "zmk,behavior-double-tap";
+			display-name = "Double Tap (Fast)";
+			#binding-cells = <2>;
+			tapping-term-ms = <150>;
+		};
+		dbl_relaxed: double_tap_relaxed {
+			compatible = "zmk,behavior-double-tap";
+			display-name = "Double Tap (Relaxed)";
+			#binding-cells = <2>;
+			tapping-term-ms = <250>;
+		};
+		// Extra speeds for the Keyform slider, 150-300 ms in steps of 5 (150, 200 and 250 are the three above).
+		// Keep the node names: saved keys refer to them by name.
+		double_tap_155 { compatible = "zmk,behavior-double-tap"; display-name = "Double Tap (155 ms)"; #binding-cells = <2>; tapping-term-ms = <155>; };
+		double_tap_160 { compatible = "zmk,behavior-double-tap"; display-name = "Double Tap (160 ms)"; #binding-cells = <2>; tapping-term-ms = <160>; };
+		double_tap_165 { compatible = "zmk,behavior-double-tap"; display-name = "Double Tap (165 ms)"; #binding-cells = <2>; tapping-term-ms = <165>; };
+		double_tap_170 { compatible = "zmk,behavior-double-tap"; display-name = "Double Tap (170 ms)"; #binding-cells = <2>; tapping-term-ms = <170>; };
+		double_tap_175 { compatible = "zmk,behavior-double-tap"; display-name = "Double Tap (175 ms)"; #binding-cells = <2>; tapping-term-ms = <175>; };
+		double_tap_180 { compatible = "zmk,behavior-double-tap"; display-name = "Double Tap (180 ms)"; #binding-cells = <2>; tapping-term-ms = <180>; };
+		double_tap_185 { compatible = "zmk,behavior-double-tap"; display-name = "Double Tap (185 ms)"; #binding-cells = <2>; tapping-term-ms = <185>; };
+		double_tap_190 { compatible = "zmk,behavior-double-tap"; display-name = "Double Tap (190 ms)"; #binding-cells = <2>; tapping-term-ms = <190>; };
+		double_tap_195 { compatible = "zmk,behavior-double-tap"; display-name = "Double Tap (195 ms)"; #binding-cells = <2>; tapping-term-ms = <195>; };
+		double_tap_205 { compatible = "zmk,behavior-double-tap"; display-name = "Double Tap (205 ms)"; #binding-cells = <2>; tapping-term-ms = <205>; };
+		double_tap_210 { compatible = "zmk,behavior-double-tap"; display-name = "Double Tap (210 ms)"; #binding-cells = <2>; tapping-term-ms = <210>; };
+		double_tap_215 { compatible = "zmk,behavior-double-tap"; display-name = "Double Tap (215 ms)"; #binding-cells = <2>; tapping-term-ms = <215>; };
+		double_tap_220 { compatible = "zmk,behavior-double-tap"; display-name = "Double Tap (220 ms)"; #binding-cells = <2>; tapping-term-ms = <220>; };
+		double_tap_225 { compatible = "zmk,behavior-double-tap"; display-name = "Double Tap (225 ms)"; #binding-cells = <2>; tapping-term-ms = <225>; };
+		double_tap_230 { compatible = "zmk,behavior-double-tap"; display-name = "Double Tap (230 ms)"; #binding-cells = <2>; tapping-term-ms = <230>; };
+		double_tap_235 { compatible = "zmk,behavior-double-tap"; display-name = "Double Tap (235 ms)"; #binding-cells = <2>; tapping-term-ms = <235>; };
+		double_tap_240 { compatible = "zmk,behavior-double-tap"; display-name = "Double Tap (240 ms)"; #binding-cells = <2>; tapping-term-ms = <240>; };
+		double_tap_245 { compatible = "zmk,behavior-double-tap"; display-name = "Double Tap (245 ms)"; #binding-cells = <2>; tapping-term-ms = <245>; };
+		double_tap_255 { compatible = "zmk,behavior-double-tap"; display-name = "Double Tap (255 ms)"; #binding-cells = <2>; tapping-term-ms = <255>; };
+		double_tap_260 { compatible = "zmk,behavior-double-tap"; display-name = "Double Tap (260 ms)"; #binding-cells = <2>; tapping-term-ms = <260>; };
+		double_tap_265 { compatible = "zmk,behavior-double-tap"; display-name = "Double Tap (265 ms)"; #binding-cells = <2>; tapping-term-ms = <265>; };
+		double_tap_270 { compatible = "zmk,behavior-double-tap"; display-name = "Double Tap (270 ms)"; #binding-cells = <2>; tapping-term-ms = <270>; };
+		double_tap_275 { compatible = "zmk,behavior-double-tap"; display-name = "Double Tap (275 ms)"; #binding-cells = <2>; tapping-term-ms = <275>; };
+		double_tap_280 { compatible = "zmk,behavior-double-tap"; display-name = "Double Tap (280 ms)"; #binding-cells = <2>; tapping-term-ms = <280>; };
+		double_tap_285 { compatible = "zmk,behavior-double-tap"; display-name = "Double Tap (285 ms)"; #binding-cells = <2>; tapping-term-ms = <285>; };
+		double_tap_290 { compatible = "zmk,behavior-double-tap"; display-name = "Double Tap (290 ms)"; #binding-cells = <2>; tapping-term-ms = <290>; };
+		double_tap_295 { compatible = "zmk,behavior-double-tap"; display-name = "Double Tap (295 ms)"; #binding-cells = <2>; tapping-term-ms = <295>; };
+		double_tap_300 { compatible = "zmk,behavior-double-tap"; display-name = "Double Tap (300 ms)"; #binding-cells = <2>; tapping-term-ms = <300>; };
+	};
+
 	keymap {
 		compatible = "zmk,keymap";
 		
