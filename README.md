@@ -21,9 +21,9 @@
 - **Visual remapping.** Click a key, pick what it does from tabs (Keys, Media, Layers, Bluetooth, Special, Advanced) instead of dropdowns. Add Ctrl/Shift/Alt/Win for shortcuts like Ctrl + C.
 - **Layers.** Add, rename, reorder and remove layers. Empty keys show what the layer below does, greyed out.
 - **Duplicate and copy layers.** *Duplicate* makes a new layer with all the keys of the current one, placed right after it. *Copy keys from…* fills the current layer with another layer's keys: replace them all, or only fill the empty ones.
-- **Set a key on several layers.** "Also set on" under the key editor writes your next change to the layers you pick, or to all of them, e.g. a game-layer toggle that works from every layer.
+- **Set a key on several layers.** "Also set on" under the key editor writes your next change to the layers you pick, or to all of them, e.g. a layer toggle that works from every layer.
 - **Home page with your current layer, live.** Shows which layer is on right now and follows as you switch, plus a summary of your setup. The active layer also gets a green dot in Remap. Needs the notifier (below).
-- **Layer notifications.** A desktop notification when you switch layer, e.g. "🎮 Game on", with per-layer on/off and your own message (🔔 Notify next to the layer buttons). Linux, with the included notifier and firmware.
+- **Layer notifications.** A desktop notification when you switch layer, with per-layer on/off and your own message (🔔 Notify next to the layer buttons). Linux, with the included notifier and firmware.
 - **Fn works on every layer.** Hold layers (like Nav) are kept at the end of the list automatically, so holding Fn always gives you Nav, whatever layer is on.
 - **Tap-hold keys.** Layer-Tap and Mod-Tap ("tap for Z, hold for Shift") through the Advanced tab.
 - **Double-tap keys.** Advanced → Double Tap: pick a key for a single tap and one for a double tap (e.g. Q / Numpad 1), plus how long it waits for a second tap (slider, 150–300 ms in steps of 5, default 200), on any key and layer. Needs the included firmware.
@@ -34,9 +34,9 @@
 - **Demo mode.** Try everything without a keyboard plugged in.
 - **Fully offline.** No servers, no tracking, nothing downloaded. Your keymap goes straight from the page to the keyboard over USB.
 
-| Overview | Key tester |
-|---|---|
-| ![Overview](screenshots/overview.png) | ![Key tester](screenshots/tester.png) |
+| Home (live layer) | Overview | Key tester |
+|---|---|---|
+| ![Home](screenshots/home.png) | ![Overview](screenshots/overview.png) | ![Key tester](screenshots/tester.png) |
 
 ---
 
@@ -60,19 +60,9 @@
 
 ---
 
-## Making a game layer
+## Match your desktop colours (DMS / matugen)
 
-1. Select **Base** and click **Duplicate**. Rename the copy to **Game**, then change only the keys you need.
-2. Give Game a key to switch it on and off: pick any key, e.g. one on your Nav layer, and choose **Layers → Game → Toggle**.
-3. Click **Save**.
-
-Holding Fn still gives you Nav while Game is on. Keyform keeps Nav at the end of the layer list for that.
-
----
-
-## Match your desktop colours (DankMaterialShell / matugen)
-
-Keyform can follow your desktop theme: new wallpaper or light/dark switch in DMS, and Keyform matches next time you open it. Without this it uses its built-in blue.
+Keyform can follow your desktop theme: new wallpaper or light/dark switch in DMS (Dux Modular Shell), and Keyform matches next time you open it. Without this it uses its built-in blue.
 
 `./linux/install.sh` sets this up. It adds a small template to matugen (the colour tool behind DMS's theming). When your theme changes, matugen writes the colours to `keyform-theme.css` and runs `keyform-apply-theme`, which copies them into your installed `keyform.html` itself, so it works in any browser, Flatpak ones included. Change your wallpaper or theme in DMS once to create it. To keep the built-in colours instead: `./linux/install.sh --no-theme`.
 
@@ -215,4 +205,3 @@ Open `keyform.html?demo` to try changes without a keyboard.
 ## Credits
 
 Built on the official [ZMK Studio client library](https://github.com/zmkfirmware/zmk-studio-ts-client). See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for the open-source libraries included. Keyform is an independent project, not affiliated with ZMK or Boardsource.
- 

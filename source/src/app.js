@@ -934,7 +934,7 @@ function renderLive() {
   $('#livetoggle').checked = S.live;
   $('#lastkey').replaceChildren(...(S.lastPressed
     ? [h('span', {}, 'Last key:'), h('kbd', {}, S.lastPressed), S.lastVia ? h('span', { class: 'via' }, `via ${S.lastVia} layer`) : null]
-    : [h('span', {}, 'Press a key on your keyboard to see where it is')]));
+    : [h('span', {}, 'Press a key on your keyboard to see where it is')]).filter(Boolean));  // replaceChildren would print "null" otherwise
 }
 
 // ---------------------------------------------------------------- assignment panel
