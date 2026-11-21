@@ -1,0 +1,9 @@
+description: |
+  Game Mod-Tap: mod-tap whose settings (hold key, tap length, hold delay, hold rule, instant hold,
+  repeat window) are packed into the first parameter, so they can be set per key from Keyform.
+  The tap key is held for "tap length" ms so games that check keys once per frame see it.
+  &gmt SETTINGS TAP_KEY
+
+compatible: "zmk,behavior-game-mod-tap"
+
+include: two_param.yaml

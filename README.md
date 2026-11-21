@@ -26,6 +26,8 @@
 - **Layer notifications.** A desktop notification when you switch layer, with per-layer on/off and your own message (🔔 Notify next to the layer buttons). Linux, with the included notifier and firmware.
 - **Fn works on every layer.** Hold layers (like Nav) are kept at the end of the list automatically, so holding Fn always gives you Nav, whatever layer is on.
 - **Tap-hold keys.** Layer-Tap and Mod-Tap ("tap for Z, hold for Shift") through the Advanced tab.
+- **Game Mod-Tap.** Advanced → Game Mod-Tap: a Mod-Tap whose taps games actually register. Normal Mod-Tap sends a tap for about 1 ms, which games that check the keyboard once per frame often miss. Game Mod-Tap holds the tap key down for a set time, and every setting is per key: tap length (off–100 ms), hold delay (100–500 ms), hold rule, instant hold and tap-then-hold repeat, plus presets and "use this timing on all Game Mod-Tap keys". Needs the included firmware.
+- **Fits any window.** On wide windows the key editor sits beside the keyboard; on narrow ones it sits below, and the keyboard shrinks to leave it room. Only the editor's contents scroll. Small windows get compact sizes by themselves (**Size** button in the top bar: Auto / Compact / Roomy), and **Hide keyboard** gives the editor the whole window.
 - **Double-tap keys.** Advanced → Double Tap: pick a key for a single tap and one for a double tap (e.g. Q / Numpad 1), plus how long it waits for a second tap (slider, 150–300 ms in steps of 5, default 200), on any key and layer. Needs the included firmware.
 - **Overview.** A list of every key that does more than type one character, on every layer, with a small map showing where it sits. Click a row to edit it. A search box finds keys by what they do, their name, layer or position.
 - **Live keys.** Keys light up as you press them, including keys on other layers (dashed outline) and the layer key that got you there.
@@ -117,11 +119,12 @@ Extras: `keyform-notify --test 2` shows layer 2's notification, and `keyform-not
 
 Handy if you use Firefox (permission is remembered for real websites) or want Keyform on any computer without downloading anything.
 
-1. In this repository on GitHub: **Settings → Pages**.
-2. Source: **Deploy from a branch**, branch **main**, folder **/ (root)**, then **Save**.
-3. After a minute it's live at `https://<your-username>.github.io/keyform/`.
+1. Make the repository public (Settings → General → Danger Zone). Pages is free for public repositories.
+2. **Settings → Pages → Source: GitHub Actions.** Leave *Custom domain* empty.
+3. Push to `main` (or Actions → **Publish Keyform** → **Run workflow**). The workflow in `.github/workflows/pages.yml` publishes `keyform.html`, and every run shows up in the Actions tab.
+4. Keyform is then at `https://<your-username>.github.io/keyform/`.
 
-Your keymap never touches GitHub. The page just runs in your browser and talks to the keyboard over USB.
+Your keymap never touches GitHub. The page just runs in your browser and talks to the keyboard over USB. The live layer and your desktop colours only work in the installed copy (app menu), which holds the notifier key and your theme.
 
 ---
 
@@ -131,8 +134,9 @@ Your keymap never touches GitHub. The page just runs in your browser and talks t
 
 | File | What it is |
 |---|---|
-| `rechteck-zmk-studio.uf2` | **Current firmware.** ZMK v0.3 with Studio enabled, unlock key off, 6 spare layers for Studio/Keyform, and the Double Tap add-on |
-| `rechteck-zmk-studio-before-doubletap.uf2` | The same without Double Tap. Flash this to go back if Double Tap gives trouble |
+| `rechteck-zmk-studio.uf2` | **Current firmware.** ZMK v0.3 with Studio enabled, unlock key off, 6 spare layers for Studio/Keyform, and the Double Tap and Game Mod-Tap add-ons |
+| `rechteck-zmk-studio-before-gamemodtap.uf2` | The same without Game Mod-Tap. Flash this to go back if Game Mod-Tap gives trouble |
+| `rechteck-zmk-studio-before-doubletap.uf2` | Without Double Tap and Game Mod-Tap |
 | `rechteck-zmk-studio-old-2layers.uf2` | Previous version (only Base + Nav, no spare layers). Fallback if needed |
 | `zmk-config/` | The source files the firmware is built from |
 
@@ -166,6 +170,8 @@ Changes you saved in Keyform or Studio normally survive a firmware update, but t
 | App menu launcher does nothing | The launcher points to the wrong place. Run `./linux/install.sh` again |
 | The Fn/layer key doesn't light up | Normal. Layer keys send nothing to the computer until you press another key with them |
 | "Add layer" is greyed out | No spare layers left in the firmware. Rebuild with more reserved layers |
+| A game misses Mod-Tap taps | Use Advanced → Game Mod-Tap instead of Mod-Tap. Still missed? Raise Tap length (40–50 ms) |
+| No Game Mod-Tap in the Advanced list | The keyboard runs older firmware. Flash `firmware/rechteck-zmk-studio.uf2` |
 | Keyboard says it's locked | Press the Studio unlock key (this firmware has the lock turned off) |
 
 ---
@@ -200,6 +206,7 @@ Open `keyform.html?demo` to try changes without a keyboard.
 
 - Combos and macros can't be *created* from Keyform or ZMK Studio. They need a firmware change. Existing ones do show up in the Overview.
 - Double tap works through the Double Tap add-on in `firmware/zmk-config` (normal ZMK can't set double taps from an app). After a single tap it waits for a possible second tap (150–300 ms, set with the slider) before sending the key.
+- Game Mod-Tap works through the Game Mod-Tap add-on in `firmware/zmk-config`. Its settings are stored inside the key, so zmk.studio shows them as one number ("Settings"); change them in Keyform.
 - Keyform can only change what the keyboard's firmware allows through ZMK Studio.
 
 ## Credits

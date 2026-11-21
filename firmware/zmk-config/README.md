@@ -24,6 +24,13 @@ need no reflashing. The Double Tap nodes at the top of the keymap are the speeds
 (one node per speed, because ZMK Studio can't send a timing). Keyform shows them as one slider. Keep the node names as they are:
 saved keys refer to them by name.
 
+Game Mod-Tap add-on: `src/behaviors/behavior_game_mod_tap.c` adds a "Game Mod-Tap" behavior
+(the `gmt` node at the top of the keymap). It works like ZMK's mod-tap, but keeps the tap key down
+for a set time so games that check keys once per frame register the tap. All of its settings
+(hold key, tap length, hold delay, hold rule, instant hold, repeat window) are packed into the key's
+first parameter, so Keyform sets them per key with no reflashing. The bit layout is described at the
+top of the .c file.
+
 Layer report: `src/layer_report.c` makes the keyboard briefly send a reserved HID key code
 (0xA5 + layer ID) whenever the active layer changes. Computers ignore these codes; the Keyform
 notifier (`linux/notifier/` in the Keyform repo) reads them to show layer notifications.

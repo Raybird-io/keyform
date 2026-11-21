@@ -3,6 +3,11 @@ config ZMK_BEHAVIOR_DOUBLE_TAP
     default y
     depends on DT_HAS_ZMK_BEHAVIOR_DOUBLE_TAP_ENABLED
 
+config ZMK_BEHAVIOR_GAME_MOD_TAP
+    bool
+    default y
+    depends on DT_HAS_ZMK_BEHAVIOR_GAME_MOD_TAP_ENABLED
+
 config KEYFORM_LAYER_REPORT
     bool "Report the active layer to the Keyform notifier"
     default y

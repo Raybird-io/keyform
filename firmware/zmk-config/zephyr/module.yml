@@ -1,4 +1,4 @@
-# Makes this config repo also a ZMK module, so it can add the Double Tap behavior below.
+# Makes this config repo also a ZMK module, so it can add the Double Tap and Game Mod-Tap behaviors below.
 name: keyform-double-tap
 build:
   cmake: .

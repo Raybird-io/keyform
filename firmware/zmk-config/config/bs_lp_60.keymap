@@ -22,6 +22,13 @@
 	// Both keys are chosen per key in Keyform (Advanced -> Double Tap), no reflashing needed.
 	// tapping-term-ms is how long it waits for a second tap (Normal 200, Fast 150, Relaxed 250, plus every 5 ms from 150 to 300).
 	behaviors {
+		// Game Mod-Tap: mod-tap that holds the tap key long enough for games to see it.
+		// All its settings are stored per key and set in Keyform (Advanced -> Game Mod-Tap).
+		gmt: game_mod_tap {
+			compatible = "zmk,behavior-game-mod-tap";
+			display-name = "Game Mod-Tap";
+			#binding-cells = <2>;
+		};
 		dbl: double_tap {
 			compatible = "zmk,behavior-double-tap";
 			display-name = "Double Tap";

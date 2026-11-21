@@ -1,0 +1,35 @@
+# Publishes Keyform to GitHub Pages: https://<your-username>.github.io/keyform/
+# Runs when keyform.html changes on main, or by hand (Actions tab -> Publish Keyform -> Run workflow).
+# Needs: Settings -> Pages -> Source: "GitHub Actions".
+name: Publish Keyform
+
+on:
+  push:
+    branches: [main]
+    paths: [keyform.html, .github/workflows/pages.yml]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      # the site is just Keyform itself, opened at the main address
+      - run: mkdir site && cp keyform.html site/index.html && cp keyform.html site/keyform.html
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+      - id: deploy
+        uses: actions/deploy-pages@v4

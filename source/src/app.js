@@ -58,6 +58,7 @@ const KIND_RULES = [
   ['mo', /^momentary layer$/], ['tog', /^toggle layer$/], ['to', /^to layer$/],
   ['lt', /^layer[- ]?tap$/], ['mt', /^mod[- ]?tap$/], ['bt', /^bluetooth$/],
   ['out', /^output selection$/], ['unlock', /^studio unlock$/], ['dbl', /^double tap( \(.*\))?$/],
+  ['gmt', /^game mod[- ]?tap$/],
 ];
 const kindOf = (name) => (KIND_RULES.find(([, re]) => re.test(name.toLowerCase())) || [null])[0];
 
@@ -75,6 +76,26 @@ const speedMs = (b) => {
   const named = { fast: 150, normal: 200, relaxed: 250 }[m[1].toLowerCase()];
   return named || parseInt(m[1], 10) || DEFAULT_MS;
 };
+// Game Mod-Tap keeps all its settings in the key's first value (see firmware behavior_game_mod_tap.c):
+//  bits 0-7 hold key ID · 8-12 tap length /5 ms · 13-19 hold delay /5 ms · 20-21 hold rule
+//  bit 22 instant hold · 23-27 repeat window /10 ms
+const GMT_DEFAULTS = { hold: 0xe1, tapMs: 30, termMs: 200, rule: 0, instant: false, repeatMs: 0 };
+const GMT_RULES = [
+  ['Hold first', 'Pressing another key while holding gives the hold right away. Best for games (Shift + W).'],
+  ['Balanced', 'Hold only if you press and let go of another key while holding. Fewer accidental holds when rolling keys.'],
+  ['Tap first', 'Only a long press becomes a hold, whatever else you press. Safest for typing, slowest hold.'],
+  ['Tap unless interrupted', 'Pressing another key gives the hold; holding it alone and letting go always taps.'],
+];
+const gmtDecode = (v) => {
+  v >>>= 0;
+  return { hold: (v & 0xff) || GMT_DEFAULTS.hold, tapMs: ((v >> 8) & 0x1f) * 5, termMs: (((v >> 13) & 0x7f) * 5) || 200, rule: (v >> 20) & 3, instant: !!((v >> 22) & 1), repeatMs: ((v >> 23) & 0x1f) * 10 };
+};
+const gmtEncode = (o) => {
+  const c = (x, lo, hi) => Math.max(lo, Math.min(hi, Math.round(x)));
+  return ((o.hold & 0xff) | (c(o.tapMs / 5, 0, 31) << 8) | (c(o.termMs / 5, 1, 127) << 13) | ((o.rule & 3) << 20) | ((o.instant ? 1 : 0) << 22) | (c(o.repeatMs / 10, 0, 31) << 23)) >>> 0;
+};
+const gmtHoldUsage = (v) => encodeUsage(PAGE_KEYBOARD, gmtDecode(v).hold);
+const gmtSummary = (o) => [o.tapMs ? `tap held ${o.tapMs} ms` : 'tap not held', `hold after ${o.termMs} ms`, GMT_RULES[o.rule][0].toLowerCase(), o.instant ? 'instant hold' : null, o.repeatMs ? `repeat ${o.repeatMs} ms` : null].filter(Boolean).join(' · ');
 const dblVariants = () => S.behaviors.filter((b) => b.kind === 'dbl').sort((a, b) => speedMs(a) - speedMs(b));
 const isTrans = (bnd) => behavior(bnd?.behaviorId)?.kind === 'trans';
 const sameBinding = (a, b) => !!a && !!b && a.behaviorId === b.behaviorId && (a.param1 >>> 0) === (b.param1 >>> 0) && (a.param2 >>> 0) === (b.param2 >>> 0);
@@ -112,6 +133,7 @@ function labelFor(binding, layerIdx = S.layerIndex) {
     case 'to': return { main: lname(p1), sub: 'switch to', cls: 'k-layer' };
     case 'lt': return { main: usageLabel(p2), sub: 'hold ' + lname(p1), cls: 'k-layer' };
     case 'mt': return { main: usageLabel(p2), sub: 'hold ' + usageLabel(p1), cls: 'k-layer' };
+    case 'gmt': return { main: usageLabel(p2), sub: 'hold ' + usageLabel(gmtHoldUsage(p1)), cls: 'k-layer k-game' };
     case 'dbl': return { main: usageLabel(p1), sub: '2× ' + usageLabel(p2) + (speedMs(b) === DEFAULT_MS ? '' : ` ${speedMs(b)}ms`), cls: 'k-layer' };
     case 'bt': {
       const n = (constName(b, 'param1', p1) || '').toLowerCase();
@@ -158,7 +180,7 @@ function classify(binding) {
       return d.mods ? 'shortcut' : null;
     }
     case 'mo': case 'tog': case 'to': return 'layer';
-    case 'lt': case 'mt': return 'taphold';
+    case 'lt': case 'mt': case 'gmt': return 'taphold';
     case 'bt': case 'out': return 'bt';
   }
   if (/dance|double/.test(nm)) return 'dance';
@@ -187,6 +209,7 @@ function describeLong(binding) {
     case 'to': return `Switches to layer ${lname(p1)}`;
     case 'lt': return `Tap: ${usageName(p2)}  ·  Hold: layer ${lname(p1)}`;
     case 'mt': return `Tap: ${usageName(p2)}  ·  Hold: ${usageName(p1)}`;
+    case 'gmt': return `Game Mod-Tap  ·  Tap: ${usageName(p2)}  ·  Hold: ${usageName(gmtHoldUsage(p1))}  ·  ${gmtSummary(gmtDecode(p1))}`;
     case 'dbl': return `Tap: ${usageName(p1)}  ·  Double tap: ${usageName(p2)}` + `  ·  waits ${speedMs(b)} ms for a second tap`;
     case 'bt': {
       const n = constName(b, 'param1', p1) || 'Bluetooth';
@@ -228,7 +251,18 @@ async function guard(fn) {
 const prefs = {
   get auto() { try { return localStorage.getItem('keyform.auto') !== 'off'; } catch { return true; } },
   set auto(v) { try { localStorage.setItem('keyform.auto', v ? 'on' : 'off'); } catch {} },
+  get density() { try { return localStorage.getItem('keyform.density') || 'auto'; } catch { return 'auto'; } },
+  set density(v) { try { localStorage.setItem('keyform.density', v); } catch {} },
 };
+
+// Size: Auto (compact in small windows), Compact (always), Roomy (never compact)
+const DENSITY = { auto: 'Size: Auto', compact: 'Size: Compact', comfy: 'Size: Roomy' };
+function applyDensity() {
+  const d = DENSITY[prefs.density] ? prefs.density : 'auto';
+  document.body.classList.toggle('density-compact', d === 'compact');
+  document.body.classList.toggle('density-comfy', d === 'comfy');
+  $('#density').textContent = DENSITY[d];
+}
 
 let connecting = false;
 async function start(demo, port, { quiet } = {}) {
@@ -340,6 +374,7 @@ function renderTop() {
 function setView(v) {
   if (!S.device) v = 'home';
   S.view = v;
+  document.body.dataset.view = v;
   $('#home').hidden = v !== 'home';
   $('#welcome').hidden = !!S.device || v !== 'home';
   $('#editor').hidden = v !== 'remap' || !S.device;
@@ -422,7 +457,7 @@ function renderOverview() {
         );
       })));
   });
-  root.append(h('p', { class: 'hint', style: 'margin-top:18px' }, 'Double-tap keys: pick a key, then Advanced → Double Tap (needs the Double Tap firmware). Combos and macros show up here if they are in your firmware; creating those needs a firmware change.'));
+  root.append(h('p', { class: 'hint', style: 'margin-top:18px' }, 'Double-tap keys: pick a key, then Advanced → Double Tap. Taps that games miss: Advanced → Game Mod-Tap. Both need the included firmware. Combos and macros show up here if they are in your firmware; creating those needs a firmware change.'));
 }
 
 // ---------------------------------------------------------------- live layer + home page
@@ -434,8 +469,9 @@ const liveUrl = (path) => `${LIVE_URL}${path}?t=${encodeURIComponent(LIVE_KEY)}`
 
 // The notifier hears the keyboard's layer changes and shares them on this computer only.
 // When it isn't running, try again after 2 s, then 4, 8 … up to once a minute.
-let liveRetry = 2000;
+let liveRetry = 2000, liveTimer = null;
 function startLiveLink() {
+  clearTimeout(liveTimer);
   if (!LIVE_KEY || typeof EventSource === 'undefined') { S.liveLink = 'nokey'; refreshLive(); return; }
   const es = new EventSource(liveUrl('/events'));
   es.onmessage = (e) => {
@@ -446,7 +482,7 @@ function startLiveLink() {
   es.onerror = () => {
     es.close();
     if (S.liveLink !== 'off') { S.liveLink = 'off'; refreshLive(); }
-    setTimeout(startLiveLink, liveRetry);
+    liveTimer = setTimeout(startLiveLink, liveRetry);
     liveRetry = Math.min(liveRetry * 2, 60000);
   };
 }
@@ -536,6 +572,9 @@ function renderHome() {
 }
 
 function renderAll() {
+  const ed = $('#editor');
+  ed.classList.toggle('key-open', S.selected !== null && !!S.device);
+  ed.classList.toggle('board-hidden', !!S.boardHidden && S.selected !== null);
   renderTop();
   if (S.view === 'home') renderHome();
   if (!S.device) return;
@@ -611,7 +650,7 @@ function renderLayerbar() {
       }, S.confirmDelete ? 'Click to confirm' : 'Remove'),
     );
   }
-  bar.append(tabs, actions);
+  bar.append(h('div', { class: 'layerbar-main' }, tabs, actions));
   if (S.copyOpen) bar.append(copyRow(l, i));
   if (S.notifyOpen) bar.append(notifyRow(l, i));
 }
@@ -811,13 +850,32 @@ function moveLayer(from, to) {
   guard(async () => { await S.device.moveLayer(from, to); await reloadKeymap(); S.layerIndex = to; S.unsaved = true; await tidyLayers(); renderAll(); });
 }
 
-function boardGeometry(container) {
+// Key size (u) that fits the width, and the height too when maxH is given
+function boardGeometry(container, maxH) {
   const keys = S.layout.keys;
   const maxX = Math.max(...keys.map((k) => k.x + k.width)) / 100;
   const maxY = Math.max(...keys.map((k) => k.y + k.height)) / 100;
-  const avail = Math.max(320, container.clientWidth - 52);
-  const u = Math.max(30, Math.min(66, Math.floor(avail / maxX)));
+  const cs = getComputedStyle(container);
+  const avail = Math.max(240, container.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight) - 4);
+  let u = Math.min(66, Math.floor(avail / maxX));
+  if (maxH) u = Math.max(Math.min(u, 26), Math.min(u, Math.floor(maxH / maxY)));  // never smaller than readable
+  u = Math.max(22, u);
   return { u, w: maxX * u, hgt: maxY * u };
+}
+
+// Wide windows put the key editor beside the keyboard (same width as in style.css)
+const sideBySide = () => window.matchMedia('(min-width: 1180px)').matches;
+
+// How tall the Remap keyboard may be, so the key editor always has room
+function remapBoardMaxH() {
+  const editor = $('#editor'), card = $('#editor .board-card');
+  if (!editor || editor.hidden || !card) return null;
+  const cs = getComputedStyle(card);
+  const pads = parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom) + ($('#editor .live')?.offsetHeight || 0) + 12;
+  const room = editor.clientHeight - $('#layerbar').offsetHeight - parseFloat(getComputedStyle($('#layerbar')).marginBottom);
+  if (sideBySide()) return Math.max(110, room - pads);
+  // stacked: keyboard gets a share, the editor below gets the rest (more of it when a key is open)
+  return Math.max(110, room * (S.selected === null ? 0.62 : 0.38) - pads);
 }
 
 // Shrink text to fit a key, and wrap onto extra lines before shrinking too far
@@ -836,15 +894,15 @@ function fitText(text, width, maxFs, charW, minFs, maxLines, maxHeight) {
   }
 }
 
-function drawBoard(el, { labelLayer, onClick, testerMode, preview }) {
-  const { u, w, hgt } = boardGeometry(el.parentElement);
+function drawBoard(el, { labelLayer, onClick, testerMode, preview, maxH }) {
+  const { u, w, hgt } = boardGeometry(el.parentElement, maxH);
   el.style.width = w + 'px';
   el.style.height = hgt + 'px';
   el.style.setProperty('--kfs', Math.max(10, Math.round(u * 0.23)) + 'px');
   el.replaceChildren();
   const pressedPos = positionsForPressed(labelLayer);
   const gap = Math.max(3, Math.round(u * 0.07));
-  const baseFs = Math.max(10, Math.round(u * 0.23));
+  const baseFs = Math.max(9, Math.round(u * 0.23));
   S.layout.keys.forEach((k, pos) => {
     const binding = layers()[labelLayer]?.bindings[pos];
     const lab = binding ? labelFor({ ...binding, _pos: pos }, labelLayer) : { main: '', sub: '' };
@@ -868,7 +926,8 @@ function drawBoard(el, { labelLayer, onClick, testerMode, preview }) {
 function renderBoard() {
   drawBoard($('#board'), {
     labelLayer: S.layerIndex,
-    onClick: (pos) => { S.selected = S.selected === pos ? null : pos; S.advPicker = null; S.advBehavior = null; renderBoard(); renderPanel(); },
+    maxH: remapBoardMaxH(),
+    onClick: (pos) => { S.selected = S.selected === pos ? null : pos; S.advPicker = null; S.advBehavior = null; if (S.selected === null) S.boardHidden = false; renderAll(); },
   });
 }
 
@@ -879,6 +938,7 @@ function usagesOf(bnd) {
   const k = (v) => { const d = decodeUsage(v); return d.page * 0x10000 + d.id; };
   if (b.kind === 'kp') return [k(bnd.param1)];
   if (b.kind === 'mt') return [k(bnd.param1), k(bnd.param2)];
+  if (b.kind === 'gmt') return [k(gmtHoldUsage(bnd.param1)), k(bnd.param2)];
   if (b.kind === 'lt') return [k(bnd.param2)];
   if (b.name.toLowerCase() === 'grave/escape') return [PAGE_KEYBOARD * 0x10000 + 0x29, PAGE_KEYBOARD * 0x10000 + 0x35];
   return [];
@@ -942,26 +1002,39 @@ const CATS = [
   ['keys', 'Keys'], ['media', 'Media'], ['layers', 'Layers'], ['bt', 'Bluetooth'], ['special', 'Special'], ['advanced', 'Advanced'],
 ];
 
+let panelScroll = { key: '', top: 0 };
 function renderPanel() {
   const panel = $('#panel');
+  const oldBody = panel.querySelector('.panel-body');
+  const scrollKey = `${S.layerIndex}:${S.selected}:${S.cat}:${S.advBehavior}`;
+  if (oldBody) panelScroll = { key: scrollKey, top: oldBody.scrollTop };
   panel.replaceChildren();
   if (S.selected === null) {
     panel.append(h('div', { class: 'empty' }, h('b', {}, 'Click any key'), ' on the keyboard above to change what it does on the ', h('b', {}, layerName(curLayer(), S.layerIndex)), ' layer.'));
     return;
   }
   const binding = curLayer().bindings[S.selected];
-  panel.append(h('div', { class: 'panel-head' },
-    h('div', {}, h('div', { class: 'title' }, `Key ${S.selected + 1}`), h('div', { class: 'meta' }, `on layer ${layerName(curLayer(), S.layerIndex)}`)),
-    h('div', { class: 'current' }, 'Currently', h('kbd', {}, describeBinding(binding)),
-      S.byKind.trans && S.layerIndex > 0 ? h('button', { class: 'icon-btn', onclick: () => assign({ behaviorId: S.byKind.trans.id, param1: 0, param2: 0 }) }, 'Clear') : null,
-      h('button', { class: 'icon-btn', title: 'Close', onclick: () => { S.selected = null; renderBoard(); renderPanel(); } }, '✕')),
-  ));
-  if (layers().length > 1) panel.append(applyToRow());
-  panel.append(h('div', { class: 'cats' }, CATS.filter(([k]) => k !== 'bt' || S.byKind.bt || S.byKind.out).map(([k, label]) =>
-    h('button', { class: 'cat' + (S.cat === k ? ' active' : ''), onclick: () => { S.cat = k; renderPanel(); } }, label))));
+  const toggleBoard = () => { S.boardHidden = !S.boardHidden; renderAll(); };
+  // compact header: key + what it does + actions on one line, category tabs + "also on" on the next
+  const close = () => { S.selected = null; S.boardHidden = false; renderAll(); };
+  panel.append(h('div', { class: 'phead' },
+    h('div', { class: 'phead-top' },
+      h('div', { class: 'phead-key' }, h('b', {}, `Key ${S.selected + 1}`), h('span', {}, layerName(curLayer(), S.layerIndex))),
+      h('div', { class: 'phead-cur', title: describeLong(binding) }, h('span', {}, 'Now'), h('kbd', {}, describeBinding(binding))),
+      h('div', { class: 'phead-actions' },
+        S.byKind.trans && S.layerIndex > 0 ? h('button', { class: 'icon-btn sm', title: 'Make this key see-through (does what the layer below does)', onclick: () => assign({ behaviorId: S.byKind.trans.id, param1: 0, param2: 0 }) }, 'Clear') : null,
+        h('button', { class: 'icon-btn sm board-toggle', title: 'Give the key editor the whole window (narrow windows only)', onclick: toggleBoard },
+          h('span', { class: 'long' }, S.boardHidden ? 'Show keyboard' : 'Hide keyboard'), h('span', { class: 'short' }, S.boardHidden ? '▾ Keys' : '▴ Keys')),
+        h('button', { class: 'icon-btn sm', title: 'Close', onclick: close }, '✕'))),
+    h('div', { class: 'phead-bottom' },
+      h('div', { class: 'cats' }, CATS.filter(([k]) => k !== 'bt' || S.byKind.bt || S.byKind.out).map(([k, label]) =>
+        h('button', { class: 'cat' + (S.cat === k ? ' active' : ''), onclick: () => { S.cat = k; renderPanel(); } }, label))),
+      layers().length > 1 ? applyToRow() : null)));
   const body = h('div', { class: 'panel-body' });
   panel.append(body);
   ({ keys: catKeys, media: catMedia, layers: catLayers, bt: catBt, special: catSpecial, advanced: catAdvanced }[S.cat] || catKeys)(body, binding);
+  // advBehavior can be filled in while drawing, so compare after
+  if (panelScroll.key === `${S.layerIndex}:${S.selected}:${S.cat}:${S.advBehavior}`) body.scrollTop = panelScroll.top;
 }
 
 // "Also set on" layer chips: a change to this key is written to every chosen layer
@@ -970,7 +1043,7 @@ function applyToRow() {
   const others = layers().map((l, i) => [l, i]).filter(([l]) => l !== cur);
   const all = others.every(([l]) => S.applyTo.has(l.id));
   return h('div', { class: 'apply-row' + (S.applyTo.size ? ' active' : '') },
-    h('span', { class: 'lbl' }, 'Also set on:'),
+    h('span', { class: 'lbl', title: 'Your next change to this key is also written to the layers you pick' }, 'Also on'),
     others.map(([l, i]) => h('button', {
       class: 'toggle-chip' + (S.applyTo.has(l.id) ? ' on' : ''),
       title: `Also put this key on the ${layerName(l, i)} layer`,
@@ -979,8 +1052,8 @@ function applyToRow() {
     h('button', {
       class: 'link-btn',
       onclick: () => { if (all) S.applyTo.clear(); else others.forEach(([l]) => S.applyTo.add(l.id)); renderPanel(); },
-    }, all ? 'None' : 'All layers'),
-    S.applyTo.size ? h('span', { class: 'apply-note' }, `Your next change goes on ${S.applyTo.size + 1} layers`) : null,
+    }, all ? 'None' : 'All'),
+    S.applyTo.size ? h('span', { class: 'apply-note', title: `Your next change goes on ${S.applyTo.size + 1} layers` }, `→ ${S.applyTo.size + 1} layers`) : null,
   );
 }
 
@@ -1106,11 +1179,20 @@ function catAdvanced(body, binding) {
       S.advParams = x.id === binding.behaviorId ? { p1: binding.param1, p2: binding.param2 } : { p1: null, p2: null };
       // Double Tap: start with the key's current letter as the single-tap key
       if (x.kind === 'dbl' && x.id !== binding.behaviorId && behavior(binding.behaviorId)?.kind === 'kp') S.advParams.p1 = binding.param1;
-      S.advPicker = null; renderPanel();
+      if (x.kind === 'gmt' && x.id !== binding.behaviorId) S.advParams = gmtStartFrom(binding);
+      S.advPicker = null; S.advListOpen = false; renderPanel();
     },
   }, x.kind === 'dbl' ? 'Double Tap' : x.name)));
+  // narrow editors show only the chosen action until you ask for the others
+  list.classList.toggle('collapsed', !S.advListOpen);
+  list.append(h('button', { class: 'adv-more', onclick: () => { S.advListOpen = !S.advListOpen; renderPanel(); } }, S.advListOpen ? 'Fewer ▴' : 'Change ▾'));
   const edit = h('div', { class: 'adv-edit' }, h('h3', {}, b.kind === 'dbl' ? 'Double Tap' : b.name));
   const sets = b.metadata || [];
+  if (b.kind === 'gmt') {
+    gmtEditor(edit, binding, b);
+    body.append(h('div', { class: 'adv' }, list, edit));
+    return;
+  }
   if (noParam(b)) {
     edit.append(h('p', { class: 'hint' }, 'This action has no settings.'));
   } else {
@@ -1140,12 +1222,169 @@ function catAdvanced(body, binding) {
       h('button', { class: 'link-btn', style: 'padding-left:0;margin-top:6px', onclick: () => setAllDoubleTapSpeeds(b) }, `Use ${speedMs(b)} ms for all double-tap keys`),
       h('p', { class: 'hint', style: 'margin:8px 0 0' }, 'Lower: single taps come through quicker, but you need to double tap faster. Higher: easier double taps, slightly slower single taps.')));
   }
+  if (b.kind === 'mt' && S.byKind.gmt) {
+    edit.append(h('div', { class: 'gmt-tip' },
+      h('span', {}, h('b', {}, 'Taps not registering in games? '), 'Normal Mod-Tap sends a tap for only about 1 ms, which many games miss. Game Mod-Tap holds it long enough and lets you tune the timing.'),
+      h('button', { class: 'btn small', onclick: () => { S.advBehavior = S.byKind.gmt.id; S.advParams = gmtStartFrom({ behaviorId: b.id, param1: S.advParams.p1 ?? binding.param1, param2: S.advParams.p2 ?? binding.param2 }); S.advPicker = null; renderPanel(); } }, 'Switch to Game Mod-Tap')));
+  }
   const ready = noParam(b) || isComplete(b);
   edit.append(h('div', { style: 'margin-top:20px' }, h('button', {
     class: 'btn primary', disabled: !ready,
     onclick: () => assign({ behaviorId: b.id, param1: S.advParams.p1 ?? 0, param2: S.advParams.p2 ?? 0 }),
   }, 'Apply to key')));
   body.append(h('div', { class: 'adv' }, list, edit));
+}
+
+// ---------------------------------------------------------------- Game Mod-Tap editor
+const gmtLast = {
+  get() { try { const v = JSON.parse(localStorage.getItem('keyform.gmtLast') || 'null'); return v && typeof v === 'object' ? { ...GMT_DEFAULTS, ...v } : { ...GMT_DEFAULTS }; } catch { return { ...GMT_DEFAULTS }; } },
+  set(o) { try { const { hold, ...timing } = o; localStorage.setItem('keyform.gmtLast', JSON.stringify(timing)); } catch {} },
+};
+const GMT_PRESETS = [
+  ['Game', 'Tap held 30 ms, hold after 200 ms', { tapMs: 30, termMs: 200, rule: 0, instant: false, repeatMs: 0 }],
+  ['Instant hold', 'Modifier goes down the moment you press', { tapMs: 30, termMs: 200, rule: 0, instant: true, repeatMs: 0 }],
+  ['Typing-friendly', 'Fewer accidental holds when typing fast', { tapMs: 20, termMs: 230, rule: 1, instant: false, repeatMs: 0 }],
+  ['Like Mod-Tap', 'Tap not held: same as normal Mod-Tap', { tapMs: 0, termMs: 200, rule: 0, instant: false, repeatMs: 0 }],
+];
+const timingOf = (o) => ({ tapMs: o.tapMs, termMs: o.termMs, rule: o.rule, instant: o.instant, repeatMs: o.repeatMs });
+const sameTiming = (a, b) => JSON.stringify(timingOf(a)) === JSON.stringify(timingOf(b));
+
+// New Game Mod-Tap: keep the key's current tap/hold keys, use the timing you used last time
+function gmtStartFrom(binding) {
+  const cur = behavior(binding?.behaviorId);
+  const o = gmtLast.get();
+  let tap = null;
+  if (cur?.kind === 'kp') tap = binding.param1;
+  if (cur?.kind === 'mt' || cur?.kind === 'lt') tap = binding.param2;
+  if (cur?.kind === 'mt') { const d = decodeUsage(binding.param1); if (d.page === PAGE_KEYBOARD && d.id >= 4 && d.id <= 0xe7) o.hold = d.id; }
+  if (cur?.kind === 'gmt') return { p1: binding.param1, p2: binding.param2 };
+  return { p1: gmtEncode(o), p2: tap };
+}
+
+// A slider with − / + buttons and a live value. Calls onSet(value) when let go.
+function msSlider({ value, min, max, step, onSet, fmt = (v) => `${v} ms` }) {
+  const val = h('b', { class: 'speed-val' }, fmt(value));
+  const slider = h('input', { type: 'range', class: 'speed-slider', min, max, step, value });
+  const fill = () => slider.style.setProperty('--p', `${((slider.value - min) / (max - min || 1)) * 100}%`);
+  fill();
+  slider.addEventListener('keydown', (e) => e.stopPropagation());
+  slider.addEventListener('input', () => { fill(); val.textContent = fmt(+slider.value); });
+  slider.addEventListener('change', () => onSet(+slider.value));
+  const nudge = (d) => onSet(Math.max(min, Math.min(max, value + d * step)));
+  return h('div', { class: 'speed-row' },
+    h('button', { class: 'icon-btn', title: `−${step}`, disabled: value <= min, onclick: () => nudge(-1) }, '−'),
+    slider,
+    h('button', { class: 'icon-btn', title: `+${step}`, disabled: value >= max, onclick: () => nudge(1) }, '+'),
+    val);
+}
+
+function gmtEditor(edit, binding, b) {
+  if (S.advParams.p1 === null || S.advParams.p1 === undefined) S.advParams = gmtStartFrom(binding);
+  const o = gmtDecode(S.advParams.p1);
+  const set = (patch) => { S.advParams.p1 = gmtEncode({ ...o, ...patch }); renderPanel(); };
+  const onKey = binding.behaviorId === b.id;
+  const applied = onKey && (binding.param1 >>> 0) === (S.advParams.p1 >>> 0) && (binding.param2 >>> 0) === (S.advParams.p2 >>> 0);
+
+  edit.append(h('p', { class: 'hint', style: 'margin:2px 0 0' }, 'Mod-Tap that holds the tap key down long enough for games to see it. Every setting below is saved on this key, so each key can be tuned on its own.'));
+
+  // keys
+  const keysRow = h('div', { class: 'gmt-keys' });
+  keysRow.append(paramField('p2', [{ name: 'Tap sends', hidUsage: {} }]));
+  const holdField = h('div', { class: 'field' }, h('label', {}, 'Hold sends'));
+  const mods = [0xe1, 0xe0, 0xe2, 0xe3, 0xe5, 0xe4, 0xe6, 0xe7];
+  const isMod = mods.includes(o.hold);
+  const pickingHold = S.advPicker === 'hold';
+  holdField.append(h('div', { class: 'chips' },
+    mods.map((id) => h('button', { class: 'chip' + (o.hold === id ? ' current' : ''), title: usageName(encodeUsage(PAGE_KEYBOARD, id)), onclick: () => { S.advPicker = null; set({ hold: id }); } }, usageLabel(encodeUsage(PAGE_KEYBOARD, id)))),
+    h('button', { class: 'chip wide' + (!isMod ? ' current' : ''), onclick: () => { S.advPicker = pickingHold ? null : 'hold'; renderPanel(); } }, !isMod ? `Other: ${usageLabel(encodeUsage(PAGE_KEYBOARD, o.hold))}` : 'Other key…')));
+  if (pickingHold) {
+    const grid = h('div', { class: 'mini-grid' });
+    const list = h('div');
+    const draw = () => { list.replaceChildren(); keyGrid(list, { groups: KEY_GROUPS, query: S.miniQuery, onPick: (u) => { S.miniQuery = ''; S.advPicker = null; if (u.page === PAGE_KEYBOARD) set({ hold: u.id }); } }); };
+    const q = h('input', { class: 'search mini-search', placeholder: 'Search keys… (e.g. "f", "space", "numpad 1")', value: S.miniQuery });
+    q.addEventListener('input', () => { S.miniQuery = q.value; draw(); });
+    q.addEventListener('keydown', (e) => { e.stopPropagation(); if (e.key === 'Escape') { S.miniQuery = ''; S.advPicker = null; renderPanel(); } if (e.key === 'Enter') list.querySelector('.chip')?.click(); });
+    grid.append(q, list); draw();
+    holdField.append(grid);
+    requestAnimationFrame(() => q.focus());
+  }
+  keysRow.append(holdField);
+  edit.append(keysRow);
+
+  // presets
+  edit.append(h('div', { class: 'field' }, h('label', {}, 'Start from'),
+    h('div', { class: 'chips' }, GMT_PRESETS.map(([name, tip, t]) => h('button', {
+      class: 'chip wide preset' + (sameTiming(o, t) ? ' current' : ''), title: tip, onclick: () => set(t),
+    }, name, h('small', {}, tip))))));
+
+  // timing
+  const sec = (title, control, hint) => h('div', { class: 'field gmt-field' }, h('label', {}, title), control, hint ? h('p', { class: 'hint gmt-hint' }, hint) : null);
+  edit.append(h('div', { class: 'gmt-grid' },
+    sec('Tap length', msSlider({ value: o.tapMs, min: 0, max: 100, step: 5, onSet: (v) => set({ tapMs: v }), fmt: (v) => (v ? `${v} ms` : 'Off') }),
+      'How long the tap key stays down. Raise it if the game still misses taps (try 30, then 40–50). Lower keeps very fast repeated taps apart. Off = normal Mod-Tap.'),
+    sec('Hold delay', msSlider({ value: o.termMs, min: 100, max: 500, step: 5, onSet: (v) => set({ termMs: v }) }),
+      'Holding the key alone longer than this gives the hold. Lower: holds kick in sooner, but taps must be quicker. Higher: relaxed taps, slower holds.'),
+  ));
+
+  edit.append(sec('Hold rule', h('div', { class: 'chips' }, GMT_RULES.map(([name], i) => h('button', { class: 'chip wide' + (o.rule === i ? ' current' : ''), onclick: () => set({ rule: i }) }, name))),
+    GMT_RULES[o.rule][1]));
+
+  const instant = h('input', { type: 'checkbox', checked: o.instant });
+  instant.addEventListener('change', () => set({ instant: instant.checked }));
+  const repeat = h('input', { type: 'checkbox', checked: o.repeatMs > 0 });
+  repeat.addEventListener('change', () => set({ repeatMs: repeat.checked ? 150 : 0 }));
+  edit.append(h('div', { class: 'gmt-grid' },
+    sec('Instant hold', h('label', { class: 'switch' }, instant, h('span', { class: 'track' }), o.instant ? 'On' : 'Off'),
+      'Presses the hold key the moment you press, while it decides. No delay for sprint/crouch, but every tap also sends a very short hold press first.'),
+    sec('Tap, then hold to repeat', h('div', {},
+      h('label', { class: 'switch' }, repeat, h('span', { class: 'track' }), o.repeatMs ? 'On' : 'Off'),
+      o.repeatMs ? h('div', { style: 'margin-top:8px' }, msSlider({ value: o.repeatMs, min: 100, max: 300, step: 10, onSet: (v) => set({ repeatMs: v }) })) : null),
+      'Tap, then press again within this time and keep holding: the tap key stays held (e.g. hold W). The catch: in that window you can\'t get the hold.'),
+  ));
+
+  // apply
+  const ready = S.advParams.p2 !== null && S.advParams.p2 !== undefined;
+  const others = gmtKeys().filter(([l, pos]) => !(l === curLayer() && pos === S.selected)).length;
+  edit.append(h('div', { class: 'gmt-apply' },
+    h('button', { class: 'btn primary', disabled: !ready || applied, onclick: () => { gmtLast.set(o); assign({ behaviorId: b.id, param1: S.advParams.p1, param2: S.advParams.p2 }); } }, applied ? 'Applied ✓' : 'Apply to key'),
+    !ready ? h('span', { class: 'hint', style: 'margin:0' }, 'Choose the tap key first') : onKey && !applied ? h('span', { class: 'unapplied' }, 'Changed, not applied yet') : null,
+    h('span', { class: 'gmt-apply-links' },
+      others ? h('button', { class: 'link-btn', onclick: () => setAllGmtTimings(o) }, `Use this timing on all ${others + (onKey ? 1 : 0)} Game Mod-Tap keys`) : null,
+      !sameTiming(o, GMT_DEFAULTS) ? h('button', { class: 'link-btn', onclick: () => set(timingOf(GMT_DEFAULTS)) }, 'Reset timing') : null)));
+  edit.append(h('p', { class: 'hint', style: 'margin:10px 0 0' }, 'Apply changes the key straight away, so you can test in your game before you click Save.'));
+}
+
+// Every Game Mod-Tap key on every layer: [layer, position, binding]
+function gmtKeys() {
+  const out = [];
+  layers().forEach((l) => l.bindings.forEach((bnd, pos) => { if (behavior(bnd?.behaviorId)?.kind === 'gmt') out.push([l, pos, bnd]); }));
+  return out;
+}
+
+// Copy the timing to every Game Mod-Tap key, keeping each key's own tap and hold keys
+function setAllGmtTimings(o) {
+  guard(async () => {
+    try {
+      const jobs = gmtKeys().map(([l, pos, bnd]) => [l, pos, { behaviorId: bnd.behaviorId, param1: gmtEncode({ ...timingOf(o), hold: gmtDecode(bnd.param1).hold }), param2: bnd.param2 }]).filter(([l, pos, nb]) => !sameBinding(l.bindings[pos], nb));
+      // the key being edited also gets its edited keys
+      const curPos = S.selected, cur = curLayer();
+      if (behavior(S.advBehavior)?.kind === 'gmt' && S.advParams.p2 !== null) {
+        const nb = { behaviorId: S.advBehavior, param1: S.advParams.p1, param2: S.advParams.p2 };
+        const i = jobs.findIndex(([l, pos]) => l === cur && pos === curPos);
+        if (i >= 0) jobs[i][2] = nb; else if (!sameBinding(cur.bindings[curPos], nb)) jobs.push([cur, curPos, nb]);
+      }
+      for (let i = 0; i < jobs.length; i++) {
+        busy('Changing timing…', `${i} of ${jobs.length}`);
+        const [l, pos, nb] = jobs[i];
+        await S.device.setBinding(l.id, pos, nb);
+        l.bindings[pos] = nb;
+      }
+      gmtLast.set(o);
+      if (jobs.length) S.unsaved = true;
+      renderAll();
+      toast(jobs.length ? `Timing set on ${jobs.length} Game Mod-Tap key${jobs.length === 1 ? '' : 's'}. Click Save to keep it.` : 'All Game Mod-Tap keys already use this timing.');
+    } finally { busy(null); }
+  });
 }
 
 // Give every Double Tap key, on every layer, the chosen speed (keeps their keys)
@@ -1274,6 +1513,13 @@ function busy(title, text) {
 
 // ---------------------------------------------------------------- boot
 function boot() {
+  applyDensity();
+  $('#density').addEventListener('click', () => {
+    const order = ['auto', 'compact', 'comfy'];
+    prefs.density = order[(order.indexOf(prefs.density) + 1) % order.length];
+    applyDensity(); renderAll();
+    toast({ auto: 'Size: Auto. Gets compact by itself in small windows.', compact: 'Size: Compact. Smaller buttons and spacing everywhere.', comfy: 'Size: Roomy. Full size, even in small windows.' }[prefs.density]);
+  });
   $('#connect').addEventListener('click', () => start(false));
   $('#demo').addEventListener('click', () => start(true));
   if (!('serial' in navigator)) {
@@ -1298,6 +1544,8 @@ function boot() {
   window.addEventListener('beforeunload', (e) => { if (S.unsaved) { e.preventDefault(); e.returnValue = ''; } });
   setView('home');
   startLiveLink();
+  // coming back to Keyform: retry the notifier link straight away instead of waiting
+  window.addEventListener('focus', () => { if (S.liveLink === 'off') { liveRetry = 2000; startLiveLink(); } });
   if (new URLSearchParams(location.search).has('demo')) start(true);
 }
 

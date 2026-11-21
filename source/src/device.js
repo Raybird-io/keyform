@@ -217,6 +217,7 @@ const DEMO_BEHAVIORS = [
   { id: 45, key: 'dbl290', name: 'Double Tap (290 ms)', metadata: [{ param1: [{ name: 'Tap', hidUsage: hid.hidUsage }], param2: [{ name: 'Double tap', hidUsage: hid.hidUsage }] }] },
   { id: 46, key: 'dbl295', name: 'Double Tap (295 ms)', metadata: [{ param1: [{ name: 'Tap', hidUsage: hid.hidUsage }], param2: [{ name: 'Double tap', hidUsage: hid.hidUsage }] }] },
   { id: 47, key: 'dbl300', name: 'Double Tap (300 ms)', metadata: [{ param1: [{ name: 'Tap', hidUsage: hid.hidUsage }], param2: [{ name: 'Double tap', hidUsage: hid.hidUsage }] }] },
+  { id: 48, key: 'gmt', name: 'Game Mod-Tap', metadata: [{ param1: [{ name: 'Settings', range: { min: 0, max: 268435455 } }], param2: [{ name: 'Tap', hidUsage: hid.hidUsage }] }] },
         ];
 
 export class DemoDevice {
